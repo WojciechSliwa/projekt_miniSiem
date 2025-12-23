@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Konfiguracja - miniSIEM{% endblock %}
+{% block content %}
+
+<section class="py-4">
+  <div class="container">
+    <h2 class="mb-4 text-danger">Panel Administracyjny</h2>
+    
+    <!-- ================= SEKCJA HOSTÓW (DOSTĘPNA) ================= -->
+    <div class="row mb-5">
+        <!-- Lewa: Formularz -->
+        <div class="col-lg-5 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-dark text-white py-2">
+                    <h5 class="mb-0 fs-6">Dodaj Hosta</h5>
+                </div>
+                <div class="card-body">
+                    <form id="hostForm">
+                        <div class="row mb-2 align-items-center">
+                            <label class="col-sm-3 col-form-label col-form-label-sm">Nazwa</label>
+                            <div class="col-sm-9"><input type="text" id="hostName" class="form-control form-control-sm" required></div>
+                        </div>
+                        <div class="row mb-2 align-items-center">
+                            <label class="col-sm-3 col-form-label col-form-label-sm">IP</label>
+                            <div class="col-sm-9"><input type="text" id="hostIP" class="form-control form-control-sm" required></div>
+                        </div>
+                        <div class="row mb-3 align-items-center">
+                            <label class="col-sm-3 col-form-label col-form-label-sm">System</label>
+                            <div class="col-sm-9">
+                                <select id="hostOS" class="form-select form-select-sm">
+                                    <option value="LINUX">Linux</option>
+                                    <option value="WINDOWS">Windows</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm w-100">Dodaj Hosta</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <!-- Prawa: Lista -->
+        <div class="col-lg-7 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-secondary text-white py-2">
+                    <h5 class="mb-0 fs-6">Zarządzanie Hostami</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div id="hostsListAdmin" class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
+                        <!-- JS renders here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= SEKCJA IP REGISTRY (UKRYTA - ZADANIE 3) ================= -->
+    <!-- 
+    TODO: ZADANIE 3 - THREAT INTEL
+    Odkomentuj poniższy blok HTML, aby umożliwić zarządzanie bazą reputacji IP.
+    Upewnij się, że w pliku api/hosts.py odblokowałeś odpowiednie endpointy!
+    -->
+
+    <!-- 
+    <div class="row">
+        <div class="col-lg-5 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-dark text-white py-2">
+                    <h5 class="mb-0 fs-6">Dodaj IP (Threat Intel)</h5>
+                </div>
+                <div class="card-body">
+                    <form id="ipForm">
+                        <div class="row mb-2 align-items-center">
+                            <label class="col-sm-3 col-form-label col-form-label-sm">Adres IP</label>
+                            <div class="col-sm-9"><input type="text" id="regIP" class="form-control form-control-sm" required></div>
+                        </div>
+                        <div class="row mb-3 align-items-center">
+                            <label class="col-sm-3 col-form-label col-form-label-sm">Status</label>
+                            <div class="col-sm-9">
+                                <select id="regStatus" class="form-select form-select-sm">
+                                    <option value="UNKNOWN">UNKNOWN</option>
+                                    <option value="BANNED">BANNED</option>
+                                    <option value="TRUSTED">TRUSTED</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-warning btn-sm w-100">Dodaj IP</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-7 mb-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-secondary text-white py-2 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fs-6">Rejestr IP</h5>
+                    <button id="refreshIPsBtn" class="btn btn-sm btn-outline-light py-0">Odśwież</button>
+                </div>
+                <div class="card-body p-0">
+                    <div id="ipListAdmin" class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    -->
+
+  </div>
+</section>
+
+<!-- MODALE -->
+<div class="modal fade" id="editHostModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Edytuj Hosta</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <form>
+            <input type="hidden" id="editHostId">
+            <div class="mb-2"><label>Nazwa</label><input type="text" id="editHostName" class="form-control"></div>
+            <div class="mb-2"><label>IP</label><input type="text" id="editHostIP" class="form-control"></div>
+            <div class="mb-2"><label>System</label>
+                <select id="editHostOS" class="form-select">
+                    <option value="LINUX">Linux</option>
+                    <option value="WINDOWS">Windows</option>
+                </select>
+            </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+        <button class="btn btn-primary" id="saveHostBtn">Zapisz</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editIPModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Edytuj IP</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <form>
+            <input type="hidden" id="editIPId">
+            <div class="mb-2"><label>Adres IP</label><input type="text" id="editIPVal" class="form-control"></div>
+            <div class="mb-2"><label>Status</label>
+                <select id="editIPStatus" class="form-select">
+                    <option value="UNKNOWN">UNKNOWN</option>
+                    <option value="BANNED">BANNED</option>
+                    <option value="TRUSTED">TRUSTED</option>
+                </select>
+            </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Anuluj</button>
+        <button class="btn btn-primary" id="saveIPBtn">Zapisz</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

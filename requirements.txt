@@ -1,0 +1,13 @@
+Flask
+Flask-SQLAlchemy
+Flask-Migrate
+paramiko
+cryptography
+python-dotenv
+psutil
+pip-audit
+Flask-login
+Flask-WTF
+WTForms
+pandas
+pyarrow
