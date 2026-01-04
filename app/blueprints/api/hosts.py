@@ -2,6 +2,7 @@ import time
 from flask import Blueprint, jsonify, request, current_app
 from datetime import timezone, datetime
 import os
+from flask_login import login_required
 
 from app.models import Host, LogSource, LogArchive, Alert, IPRegistry
 from app.services.remote_client import RemoteClient
@@ -16,11 +17,13 @@ api_bp = Blueprint("api_hosts", __name__)
 # --- CRUD HOSTS (GOTOWE - ABY UI DZIAŁAŁO) ---
 
 @api_bp.route("/hosts", methods=["GET"])
+@login_required
 def get_hosts():
     hosts = Host.query.all()
     return jsonify([h.to_dict() for h in hosts])
 
 @api_bp.route("/hosts", methods=["POST"])
+@login_required
 def add_host():
     data = request.get_json()
     if not data: return jsonify({"error": "Brak danych"}), 400
@@ -32,6 +35,7 @@ def add_host():
     return jsonify(new_host.to_dict()), 201
 
 @api_bp.route("/hosts/<int:host_id>", methods=["DELETE"])
+@login_required
 def delete_host(host_id):
     host = Host.query.get_or_404(host_id)
     db.session.delete(host)
@@ -39,6 +43,7 @@ def delete_host(host_id):
     return jsonify({"message": "Usunięto hosta"}), 200
 
 @api_bp.route("/hosts/<int:host_id>", methods=["PUT"])
+@login_required
 def update_host(host_id):
     host = Host.query.get_or_404(host_id)
     data = request.get_json()
@@ -51,6 +56,7 @@ def update_host(host_id):
 # --- MONITORING LIVE (GOTOWE) ---
 
 @api_bp.route("/hosts/<int:host_id>/ssh-info", methods=["GET"])
+@login_required
 def get_ssh_info(host_id):
     host = Host.query.get_or_404(host_id)
     ssh_user = current_app.config.get("SSH_DEFAULT_USER", "vagrant")
@@ -80,6 +86,7 @@ def get_ssh_info(host_id):
         return jsonify({"error": f"Błąd połączenia: {str(e)}"}), 500
 
 @api_bp.route("/hosts/<int:host_id>/windows-info", methods=["GET"])
+@login_required
 def get_windows_info(host_id):
     import psutil
     host = Host.query.get_or_404(host_id)
@@ -110,6 +117,7 @@ def get_windows_info(host_id):
 # ===================================================================
 
 @api_bp.route("/hosts/<int:host_id>/logs", methods=["POST"])
+@login_required
 def fetch_logs(host_id):
     host = Host.query.get_or_404(host_id)
     
