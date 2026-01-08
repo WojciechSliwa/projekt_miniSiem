@@ -116,19 +116,7 @@ def get_windows_info(host_id):
 # MIEJSCE NA TWOJĄ IMPLEMENTACJĘ (ZADANIE 2 i 3)
 # ===================================================================
 
-@api_bp.route("/hosts/<int:host_id>/logs", methods=["POST"])
-@login_required
-def fetch_logs(host_id):
-    host = Host.query.get_or_404(host_id)
-    
-    # Pobieramy lub tworzymy źródło logów
-    log_source = LogSource.query.filter_by(host_id=host.id).first()
-    if not log_source:
-        log_source = LogSource(host_id=host.id, log_type='security', last_fetch=None)
-        db.session.add(log_source)
-        db.session.commit()
-    
-    # TODO: ZADANIE 2 - INTEGRACJA POBIERANIA LOGÓW
+# TODO: ZADANIE 2 - INTEGRACJA POBIERANIA LOGÓW
     # Ten endpoint obecnie nic nie robi. Twoim zadaniem jest jego uzupełnienie.
     # Wzoruj się na plikach 'test_real_ssh_logs.py' oraz 'test_windows_logs.py'.
     
@@ -141,9 +129,69 @@ def fetch_logs(host_id):
     # 5. Zaktualizuj log_source.last_fetch na bieżący czas.
     # 6. Dodaj wpis do LogArchive (historia pobrań).
     # 7. Wywołaj LogAnalyzer.analyze_parquet(filename, host.id) aby wykryć zagrożenia.
-    
     # Na razie zwracamy błąd 501 (Not Implemented)
-    return jsonify({"message": "Funkcja API nie jest jeszcze gotowa", "alerts": 0}), 501
+
+@api_bp.route("/hosts/<int:host_id>/logs", methods=["POST"])
+@login_required
+def fetch_logs(host_id):
+    host = Host.query.get_or_404(host_id)
+    
+    # Pobieramy lub tworzymy źródło logów
+    log_source = LogSource.query.filter_by(host_id=host.id).first()
+    if not log_source:
+        log_source = LogSource(host_id=host.id, log_type='security', last_fetch=None)
+        db.session.add(log_source)
+        db.session.commit()
+    logs = []
+
+    # przyrostowe pobranie logów z użyciem LogCollector i odpowiedniego klienta
+    try:
+        if host.os_type == 'LINUX':
+            ssh_user = current_app.config.get("SSH_DEFAULT_USER", "vagrant")
+            ssh_port = current_app.config.get("SSH_DEFAULT_PORT", 2222)
+            ssh_key = current_app.config.get("SSH_KEY_FILE")
+            
+            with RemoteClient(host=host.ip_address, user=ssh_user, port=ssh_port, key_file=ssh_key) as client:
+                logs = LogCollector.get_linux_logs(client, last_fetch_time=log_source.last_fetch)
+        
+        elif host.os_type == 'WINDOWS':
+            with WinClient() as client:
+                logs = LogCollector.get_windows_logs(client, last_fetch_time=log_source.last_fetch)
+
+        if not logs:
+            return jsonify({"message": "Brak nowych logów", "alerts": 0}), 200
+        
+        #archiwizacja logow do pliku parquet
+        filename, count = DataManager.save_logs_to_parquet(logs, host.id)
+        
+        if not filename:
+            return jsonify({"error": "Błąd zapisu danych do storage"}), 500
+
+        # wpis o pobraniu danych do LogArchive
+        archive_entry = LogArchive(
+            host_id=host.id,
+            filename=filename,
+            record_count=count,
+            timestamp=datetime.now(timezone.utc)
+        )
+        db.session.add(archive_entry)
+        
+        # aktualizacja last_fetch
+        log_source.last_fetch = datetime.now(timezone.utc)
+        db.session.commit()
+
+        #wywołanie LogAnalyzer
+        alerts_count = LogAnalyzer.analyze_parquet(filename, host.id)
+
+        return jsonify({
+            "message": f"Pomyślnie pobrano {count} logów",
+            "filename": filename,
+            "alerts": alerts_count
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Błąd podczas pobierania logów: {str(e)}"}), 500
 
 
 # TODO: ZADANIE 3 - API DLA REJESTRU IP I ALERTÓW
