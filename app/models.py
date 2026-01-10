@@ -1,8 +1,7 @@
 from datetime import datetime, timezone
 
 from flask_login import UserMixin
-
-f: rom werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from .extensions import db
 
@@ -102,4 +101,3 @@ class Alert(db.Model):
             "severity": self.severity,
             "source_ip": self.source_ip,
         }
-
