@@ -1,7 +1,8 @@
 # app/services/log_collector.py
-import re
 import json
+import re
 from datetime import datetime
+
 
 class LogCollector:
     """
@@ -12,9 +13,11 @@ class LogCollector:
     # Linux w journalctl zwraca treść błędu jako tekst w polu MESSAGE.
     # Musimy użyć Regex, aby wyciągnąć IP i Usera.
     LINUX_PATTERNS = {
-        'failed_password': re.compile(r"Failed password for (?:invalid user )?([\w.-]+) from ([\d.]+)"),
-        'invalid_user': re.compile(r"Invalid user ([\w.-]+) from ([\d.]+)"),
-        'sudo': re.compile(r"sudo:\s+([a-zA-Z0-9._-]+)\s*:"),
+        "failed_password": re.compile(
+            r"Failed password for (?:invalid user )?([\w.-]+) from ([\d.]+)"
+        ),
+        "invalid_user": re.compile(r"Invalid user ([\w.-]+) from ([\d.]+)"),
+        "sudo": re.compile(r"sudo:\s+([a-zA-Z0-9._-]+)\s*:"),
     }
 
     # =========================================================================
@@ -23,33 +26,32 @@ class LogCollector:
     @staticmethod
     def get_linux_logs(ssh_client, last_fetch_time=None):
         logs = []
-        
+
         # Budowanie komendy: pobierz JSON z journalctl
-        cmd = "sudo journalctl -u ssh -o json --no-pager"
-        
+        cmd = "sudo journalctl -u sshd -o json --no-pager"
         if last_fetch_time:
             since_str = last_fetch_time.strftime("%Y-%m-%d %H:%M:%S")
             cmd += f' --since "{since_str}"'
         else:
-            cmd += ' --since "7 days ago"' # Domyślny zasięg na start
+            cmd += ' --since "7 days ago"'  # Domyślny zasięg na start
 
         print(f"DEBUG [Linux]: Executing {cmd}")
-        
+
         try:
             stdout, stderr = ssh_client.run(cmd)
-            
             if not stdout:
                 return []
 
             for line in stdout.splitlines():
-                if not line.strip(): continue
+                if not line.strip():
+                    continue
                 try:
                     # Parsowanie JSON z journald
                     entry = json.loads(line)
-                    message = entry.get('MESSAGE', '')
-                    
+                    message = entry.get("MESSAGE", "")
+
                     # Konwersja czasu (mikrosekundy -> datetime)
-                    ts_micro = int(entry.get('__REALTIME_TIMESTAMP', 0))
+                    ts_micro = int(entry.get("__REALTIME_TIMESTAMP", 0))
                     timestamp = datetime.fromtimestamp(ts_micro / 1_000_000)
 
                     # Analiza treści (Logika Regex)
@@ -70,70 +72,72 @@ class LogCollector:
     @staticmethod
     def _parse_linux_message(message, timestamp):
         # Helper do sprawdzania Regexów
-        
+
         # 1. Failed Password
-        match = LogCollector.LINUX_PATTERNS['failed_password'].search(message)
+        match = LogCollector.LINUX_PATTERNS["failed_password"].search(message)
         if match:
             return {
-                'timestamp': timestamp,
-                'alert_type': 'FAILED_LOGIN',
-                'source_ip': match.group(2),
-                'user': match.group(1),
-                'message': message,
-                'raw_log': message
+                "timestamp": timestamp,
+                "alert_type": "FAILED_LOGIN",
+                "source_ip": match.group(2),
+                "user": match.group(1),
+                "message": message,
+                "raw_log": message,
             }
-        
+
         # 2. Invalid User
-        match = LogCollector.LINUX_PATTERNS['invalid_user'].search(message)
+        match = LogCollector.LINUX_PATTERNS["invalid_user"].search(message)
         if match:
             return {
-                'timestamp': timestamp,
-                'alert_type': 'INVALID_USER',
-                'source_ip': match.group(2),
-                'user': match.group(1),
-                'message': message,
-                'raw_log': message
+                "timestamp": timestamp,
+                "alert_type": "INVALID_USER",
+                "source_ip": match.group(2),
+                "user": match.group(1),
+                "message": message,
+                "raw_log": message,
             }
 
         # 3. Sudo
-        match = LogCollector.LINUX_PATTERNS['sudo'].search(message)
+        match = LogCollector.LINUX_PATTERNS["sudo"].search(message)
         if match:
-             return {
-                'timestamp': timestamp,
-                'alert_type': 'SUDO_USAGE',
-                'source_ip': 'LOCAL',
-                'user': match.group(1),
-                'message': message,
-                'raw_log': message
+            return {
+                "timestamp": timestamp,
+                "alert_type": "SUDO_USAGE",
+                "source_ip": "LOCAL",
+                "user": match.group(1),
+                "message": message,
+                "raw_log": message,
             }
         return None
 
- # =========================================================================
+    # =========================================================================
     # METODA 2: WINDOWS (PowerShell + XML Parsing)
     # =========================================================================
     @staticmethod
     def get_windows_logs(win_client, last_fetch_time=None):
         logs = []
-        
+
         # Budujemy filtr dla PowerShell
         # Jeśli mamy last_fetch_time, pobieramy logi nowsze niż ta data.
         # Jeśli nie (pierwsze uruchomienie), pobieramy 20 ostatnich.
-        
+
         if last_fetch_time:
             # Formatowanie daty dla PowerShell: 'yyyy-MM-dd HH:mm:ss'
-            ts_str = last_fetch_time.strftime('%Y-%m-%d %H:%M:%S')
+            ts_str = last_fetch_time.strftime("%Y-%m-%d %H:%M:%S")
             # StartTime musi być rzutowane na [datetime]
-            filter_script = f"@{{LogName='Security'; Id=4625; StartTime=[datetime]'{ts_str}'}}"
-            params = "" # Pobierz wszystko od tej daty
+            filter_script = (
+                f"@{{LogName='Security'; Id=4625; StartTime=[datetime]'{ts_str}'}}"
+            )
+            params = ""  # Pobierz wszystko od tej daty
         else:
             filter_script = "@{LogName='Security'; Id=4625}"
-            params = "-MaxEvents 20" # Domyślny limit na start
+            params = "-MaxEvents 20"  # Domyślny limit na start
 
         # Komenda PowerShell:
         # 1. Get-WinEvent z filtrem
         # 2. ToXml() -> pozwala wyciągnąć IpAddress niezależnie od języka OS
         # 3. Parsowanie XML i budowanie obiektu JSON
-        
+
         ps_cmd = (
             f"Get-WinEvent -FilterHashtable {filter_script} {params} -ErrorAction SilentlyContinue | "
             "ForEach-Object { "
@@ -148,14 +152,14 @@ class LogCollector:
             "   } "
             "} | ConvertTo-Json -Compress"
         )
-        
-        print(f"DEBUG [Windows]: Executing PS with filter: {filter_script}") 
+
+        print(f"DEBUG [Windows]: Executing PS with filter: {filter_script}")
 
         try:
             stdout = win_client.run_ps(ps_cmd)
-            
+
             if not stdout:
-                return [] # Brak logów lub błąd PS
+                return []  # Brak logów lub błąd PS
 
             try:
                 data = json.loads(stdout)
@@ -168,10 +172,10 @@ class LogCollector:
 
             for entry in entries:
                 # Czyste dane ze struktury XML
-                ip = entry.get('IpAddress', '-')
-                user = entry.get('TargetUserName', 'UNKNOWN')
-                ts_str = entry.get('Timestamp')
-                
+                ip = entry.get("IpAddress", "-")
+                user = entry.get("TargetUserName", "UNKNOWN")
+                ts_str = entry.get("Timestamp")
+
                 # Konwersja daty (String -> Datetime)
                 try:
                     timestamp = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
@@ -179,18 +183,20 @@ class LogCollector:
                     timestamp = datetime.now()
 
                 # Normalizacja IP ("-" oznacza logowanie lokalne)
-                if not ip or ip == '-':
-                    ip = 'LOCAL_CONSOLE'
+                if not ip or ip == "-":
+                    ip = "LOCAL_CONSOLE"
 
                 # Dodajemy do listy w formacie ujednoliconym z Linuxem
-                logs.append({
-                    'timestamp': timestamp,
-                    'alert_type': 'WIN_FAILED_LOGIN',
-                    'source_ip': ip,
-                    'user': user,
-                    'message': f"Windows Logon Failure for user: {user} (Event 4625)",
-                    'raw_log': json.dumps(entry)
-                })
+                logs.append(
+                    {
+                        "timestamp": timestamp,
+                        "alert_type": "WIN_FAILED_LOGIN",
+                        "source_ip": ip,
+                        "user": user,
+                        "message": f"Windows Logon Failure for user: {user} (Event 4625)",
+                        "raw_log": json.dumps(entry),
+                    }
+                )
             print(f"DEBUG [Windows]: Collected {len(logs)} logs.")
         except Exception as e:
             print(f"Error collecting Windows logs: {e}")
