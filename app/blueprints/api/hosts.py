@@ -258,7 +258,13 @@ def fetch_logs(host_id):
 def get_ips():
     ips = IPRegistry.query.order_by(IPRegistry.last_seen.desc()).all()
     # Zwróć listę JSON
-    return jsonify(ips)
+    #return jsonify(ips)
+    return jsonify([{
+        'id': ip.id,
+        'ip_address': ip.ip_address,
+        'status': ip.status,
+        'last_seen': ip.last_seen.strftime('%Y-%m-%d %H:%M:%S') if ip.last_seen else None
+    } for ip in ips])
 
 
 @api_bp.route("/ips", methods=["POST"])
