@@ -66,7 +66,7 @@ export async function fetchIPs() {
   // 1. Wykonaj fetch GET na '/api/ips'
   const res = await fetch("/api/ips");
   // 2. Zwróć json
-  return await res.json();
+  return res.json();
 }
 
 export async function createIP(data) {
@@ -78,7 +78,7 @@ export async function createIP(data) {
   });
   // 2. Obsłuż błędy (!res.ok)
   if (!res.ok) throw new Error((await res.json()).error);
-  return await res.json();
+  return res.json();
 }
 
 export async function updateIP(id, data) {
@@ -89,18 +89,18 @@ export async function updateIP(id, data) {
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Błąd edycji adresu IP");
-  return await res.json();
+  return res.json();
 }
 
 export async function removeIP(id) {
   // DELETE na /api/ips/<id>
-  await fetch(`/api/ips/${id}`, { method: "DELETE" });
+  const res = await fetch(`/api/ips/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Błąd w usuwaniu adresu IP");
+  return res.json();
 }
 
 export async function fetchAlerts() {
   // GET na /api/alerts
   const res = await fetch("/api/alerts");
-  return await res.json();
+  return res.json();
 }
-
