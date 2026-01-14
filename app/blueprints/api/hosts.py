@@ -255,6 +255,7 @@ def fetch_logs(host_id):
 
 
 @api_bp.route("/ips", methods=["GET"])
+@login_required
 def get_ips():
     ips = IPRegistry.query.order_by(IPRegistry.last_seen.desc()).all()
     # Zwróć listę JSON
@@ -268,6 +269,7 @@ def get_ips():
 
 
 @api_bp.route("/ips", methods=["POST"])
+@login_required
 def add_ip():
     # Dodaj nowe IP (pamiętaj o commit)
     data = request.get_json()
@@ -286,6 +288,7 @@ def add_ip():
 
 
 @api_bp.route("/ips/<int:ip_id>", methods=["PUT"])
+@login_required
 def update_ip(ip_id):
     # Edycja statusu
     data = request.get_json()
@@ -301,6 +304,7 @@ def update_ip(ip_id):
 
 
 @api_bp.route("/ips/<int:ip_id>", methods=["DELETE"])
+@login_required
 def delete_ip(ip_id):
     ip_entry = IPRegistry.query.get_or_404(ip_id)
     try:
@@ -313,6 +317,7 @@ def delete_ip(ip_id):
 
 
 @api_bp.route("/alerts", methods=["GET"])
+@login_required
 def get_recent_alerts():
     # Zwróć 20 ostatnich alertów posortowanych malejąco po dacie
     alert_query = Alert.query.order_by(Alert.timestamp.desc()).limit(20)
