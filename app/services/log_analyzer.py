@@ -43,8 +43,8 @@ class LogAnalyzer:
             user = row.get("user", "unknown")
 
             # Ignorujemy lokalne
-            if ip in ["LOCAL", "LOCAL_CONSOLE", "127.0.0.1", "::1"]:
-                continue
+            #if ip in ["LOCAL", "LOCAL_CONSOLE", "127.0.0.1", "::1"]:
+                #continue
 
             # =======================================================
             # TODO: ZADANIE 3 - LOGIKA SIEM (THREAT INTELLIGENCE)
@@ -83,7 +83,7 @@ class LogAnalyzer:
                 source_ip=ip,
                 severity=alert_severity,
                 message=message,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=row["timestamp"],
             )
 
             # 6. Dodaj do sesji (db.session.add) i zwiększ licznik alerts_created.
