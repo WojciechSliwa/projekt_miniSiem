@@ -41,6 +41,7 @@ class LogAnalyzer:
         for index, row in threats.iterrows():
             ip = row["source_ip"]
             user = row.get("user", "unknown")
+            timestamp = row["timestamp"]
 
             # Ignorujemy lokalne
             #if ip in ["LOCAL", "LOCAL_CONSOLE", "127.0.0.1", "::1"]:
@@ -62,6 +63,17 @@ class LogAnalyzer:
                 db.session.add(iphost)
             else:
                 iphost.last_seen = datetime.now(timezone.utc)
+            
+            existing_alert = Alert.query.filter_by(
+                host_id=host_id,
+                timestamp=timestamp,
+                source_ip=ip,
+                alert_type=row["alert_type"]
+            ).first()
+
+            # by nie multiplikowac alertow zwiazanych z danym logiem 
+            if existing_alert:
+                db.session.delete(existing_alert)
 
             # 4. Ustal poziom alertu (severity) i treść wiadomości (message):
             #    - Domyślny poziom: 'WARNING'.
@@ -83,7 +95,7 @@ class LogAnalyzer:
                 source_ip=ip,
                 severity=alert_severity,
                 message=message,
-                timestamp=row["timestamp"],
+                timestamp=timestamp,
             )
 
             # 6. Dodaj do sesji (db.session.add) i zwiększ licznik alerts_created.
