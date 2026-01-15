@@ -186,6 +186,7 @@ def fetch_logs(host_id):
         log_source = LogSource(host_id=host.id, log_type="security", last_fetch=None)
         db.session.add(log_source)
         db.session.commit()
+    
     logs = []
 
     # przyrostowe pobranie logów z użyciem LogCollector i odpowiedniego klienta
@@ -207,7 +208,7 @@ def fetch_logs(host_id):
                 logs = LogCollector.get_windows_logs(
                     client, last_fetch_time=log_source.last_fetch
                 )
-
+        
         if not logs:
             return jsonify({"message": "Brak nowych logów", "alerts": 0}), 200
 
@@ -225,9 +226,7 @@ def fetch_logs(host_id):
             timestamp=datetime.now(timezone.utc),
         )
         db.session.add(archive_entry)
-
-        # aktualizacja last_fetch
-        log_source.last_fetch = datetime.now(timezone.utc)
+        log_source.last_fetch = datetime.now()
         db.session.commit()
 
         # wywołanie LogAnalyzer
